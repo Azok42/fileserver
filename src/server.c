@@ -10,7 +10,7 @@
 #include <signal.h>
 
 #define PORT 8080
-#define ADDR "localhost" // TODO: change that for release
+#define ADDR "127.0.0.1" // TODO: change that for release
 #define MAX_CLIENTS 10
 #define CHANK_SIZE 1024
 
