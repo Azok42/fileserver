@@ -13,6 +13,8 @@
 #define SERVER_ADDR "127.0.0.1"
 
 int initConnection();
+int getDate(char *buffer, int bufferLength);
+int getFileLength(char *path);
 
 int main() {
 	initConnection();
@@ -40,4 +42,42 @@ int initConnection() {
 	}
 
 	return 0;
+}
+
+int makeUploadHeader(char **buffer, char *filePath) {
+	char dateBuf[30];
+	getDate(dateBuf, sizeof(dateBuf));
+
+	int fileLength = getFileLength(filePath);
+	
+	char hash[5] = "todo";
+
+	int length = asprintf(buffer, 
+			"date=%s\r\n"
+			"type=upload\r\n"
+			"file-length=%d\r\n"
+			"path=%s\r\n"
+			"hash=%s\r\n"
+			"\r\n",
+			dateBuf, fileLength, filePath, hash); 
+
+	return length;
+}
+
+int getDate(char *buffer, int bufferLength) {
+	time_t now = time(NULL);
+	strftime(buffer, bufferLength, "%d %b %Y %H:%M:%S", gmtime(&now));
+
+	return 0;
+}
+
+int getFileLength(char *path) {
+	FILE *fp = fopen(path, "rb");
+	if (!fp)
+		return 1;
+
+	fseek(fp, 0, SEEK_END);
+	int contentSize = ftell(fp);
+	fclose(fp);
+	return contentSize;
 }

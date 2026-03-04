@@ -12,7 +12,7 @@
 #define PORT 8080
 #define ADDR "127.0.0.1" // TODO: change that for release
 #define MAX_CLIENTS 10
-#define CHANK_SIZE 1024
+#define CHUNK_SIZE 1024
 
 int initConnection();
 
@@ -78,6 +78,32 @@ int initConnection() {
 
 	close(clientSocket);
 	return 0;
+}
+
+int getHeader(int socket, char **buffer) {
+	char bufferTmp[CHUNK_SIZE];
+	ssize_t receivedBytes;
+	*buffer = NULL;
+
+	while ((receivedBytes = recv(socket, bufferTmp, CHUNK_SIZE - 1 , 0)) > 0) {
+		bufferTmp[receivedBytes++] = '\0';
+		
+		if (!(*buffer)) {
+			*buffer = (char *) malloc(receivedBytes);
+			strcpy(*buffer, bufferTmp);
+		} else {
+			*buffer = realloc(*buffer, strlen(*buffer) + receivedBytes);
+			strcat(*buffer, bufferTmp);
+		}
+
+		char *header_end = strstr(*buffer, "\r\n\r\n");
+		if (!header_end) {
+			*header_end = '\0';
+			return 0;
+		}
+	}
+
+	return -1;
 }
 
 void handleSigchld(int sig) {
