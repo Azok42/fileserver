@@ -106,6 +106,27 @@ int getHeader(int socket, char **buffer) {
 	return -1;
 }
 
+int sendFile(int socket, char *path) {
+	char *fData[CHUNK_SIZE];
+	FILE *fp = fopen(path, "rb");
+
+	size_t nBytes = 0;
+	int sent = 0;
+
+	while ((nBytes = fread(fData, sizeof(char), CHUNK_SIZE, fp)) > 0) {
+		int offset = 0;
+
+		while ((sent = send(socket, fData + offset, nBytes, 0)) > 0) {
+			offset += sent;
+			nBytes -= sent;
+		}
+	}
+
+	fclose(fp);
+
+	return 0;
+}
+
 void handleSigchld(int sig) {
 	while (waitpid(-1, NULL, WNOHANG) > 0);
 }
