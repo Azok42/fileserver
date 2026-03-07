@@ -43,7 +43,7 @@ int initConnection() {
 	serverAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
 	serverAddr.sin_port = htons(SERVER_PORT);
 
-	if (connect(sockfd, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) != 0 ) {
+	if (connect(sockfd, (struct sockaddr*)&serverAddr, sizeof serverAddr) != 0 ) {
 		printf("Connection failed");
 		exit(1);
 	}
@@ -59,7 +59,7 @@ int initConnection() {
 
 int makeUploadHeader(char **buffer, char *filePath) {
 	char dateBuf[30];
-	getDate(dateBuf, sizeof(dateBuf));
+	getDate(dateBuf, sizeof dateBuf);
 
 	int fileLength = getFileLength(filePath);
 	
@@ -79,7 +79,7 @@ int makeUploadHeader(char **buffer, char *filePath) {
 
 int makeDownloadHeader(char **buffer, int fileID) {
 	char dateBuf[30];
-	getDate(dateBuf, sizeof(dateBuf));
+	getDate(dateBuf, sizeof dateBuf);
 
 	int length = asprintf(buffer, 
 			"date=%s\r\n"
@@ -93,7 +93,7 @@ int makeDownloadHeader(char **buffer, int fileID) {
 
 int makeSyncHeader(char **buffer) {
 	char dateBuf[30];
-	getDate(dateBuf, sizeof(dateBuf));
+	getDate(dateBuf, sizeof dateBuf);
 
 	char hash[5] = "todo";
 

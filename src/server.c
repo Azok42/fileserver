@@ -43,18 +43,18 @@ int initConnection() {
 	}
 
 	int reuse = 1;
-	int result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(reuse));
+	int result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof reuse);
 	if (result < 0) {
 		printf("Error at socket option setting\n");
 		exit(1);
 	}
 
-	memset(&serverAddr, '\0', sizeof(serverAddr));
+	memset(&serverAddr, '\0', sizeof serverAddr);
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(PORT);
 	serverAddr.sin_addr.s_addr = inet_addr(ADDR);
 
-	ret = bind(sockfd, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+	ret = bind(sockfd, (struct sockaddr*)&serverAddr, sizeof serverAddr);
 	if (ret < 0) {
 		printf("Error at binding\n");
 	}
@@ -96,7 +96,7 @@ int getHeaderAndFile(int socket, char **buffer) {
 		bufferTmp[receivedBytes++] = '\0';
 
 		if (!(*buffer)) {
-			*buffer = (char *) malloc(receivedBytes);
+			*buffer = malloc(receivedBytes);
 			strcpy(*buffer, bufferTmp);
 		} else {
 			*buffer = realloc(*buffer, strlen(*buffer) + receivedBytes);
@@ -165,7 +165,7 @@ int extractDataFromBuffer(char *buffer, char *date, char *type, char *hash, int 
 	if (!pathLoc)
 		return -1;
 	int pathLength = strstr(pathLoc, "\r\n") - pathLoc - 5;
-	*path = (char *) malloc(pathLength + strlen(DATA_PATH));
+	*path = malloc(pathLength + strlen(DATA_PATH));
 	strcpy(*path, DATA_PATH);
 	strncat(*path, pathLoc + 5, pathLength);
 
