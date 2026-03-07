@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -13,8 +14,12 @@
 #define ADDR "127.0.0.1" // TODO: change that for release
 #define MAX_CLIENTS 10
 #define CHUNK_SIZE 1024
+#define DATA_PATH "data-server/"
 
 int initConnection();
+int sendFile(int socket, char *path);
+int getHeaderAndFile(int socket, char **buffer);
+int extractDataFromBuffer(char *buffer, char *date, char *type, char *hash, int *length, char **path);
 
 // signals
 void handleSigchld(int sig);
@@ -57,7 +62,7 @@ int initConnection() {
 	if (listen(sockfd, MAX_CLIENTS) == 0)
 		printf("Listening for Connections\n");
 
-	signal (SIGCHLD, handleSigchld);
+	signal(SIGCHLD, handleSigchld);
 
 	while (1) {
 		clientSocket = accept(sockfd, (struct sockaddr*)&cliAddr, &addrSize);
@@ -68,11 +73,13 @@ int initConnection() {
 
 		if ((childPID = fork()) > 0)
 			continue;
-
 		close(sockfd);
 
+		char *buffer;
+		getHeaderAndFile(clientSocket, &buffer);
+		printf("%s\n", buffer);
 
-
+		free(buffer);
 		exit(0);
 	}
 
@@ -80,14 +87,14 @@ int initConnection() {
 	return 0;
 }
 
-int getHeader(int socket, char **buffer) {
+int getHeaderAndFile(int socket, char **buffer) {
 	char bufferTmp[CHUNK_SIZE];
 	ssize_t receivedBytes;
 	*buffer = NULL;
 
 	while ((receivedBytes = recv(socket, bufferTmp, CHUNK_SIZE - 1 , 0)) > 0) {
 		bufferTmp[receivedBytes++] = '\0';
-		
+
 		if (!(*buffer)) {
 			*buffer = (char *) malloc(receivedBytes);
 			strcpy(*buffer, bufferTmp);
@@ -96,14 +103,73 @@ int getHeader(int socket, char **buffer) {
 			strcat(*buffer, bufferTmp);
 		}
 
-		char *header_end = strstr(*buffer, "\r\n\r\n");
-		if (!header_end) {
-			*header_end = '\0';
+		char *headerEnd = strstr(*buffer, "\r\n\r\n");
+		if (!headerEnd)
+			continue;
+
+		*headerEnd = '\0';
+
+		char date[20], type[9], hash[10];
+		char *path;
+		int fileSize;
+		extractDataFromBuffer(*buffer, date, type, hash, &fileSize, &path);
+
+		if (!strcmp(type, "upload"))
 			return 0;
+
+		FILE *fp = fopen(path, "wb");
+		if (!fp) {
+			return -1;
 		}
+
+		int bytesToWrite = CHUNK_SIZE - (headerEnd - *buffer) - 5;
+		fwrite(headerEnd + 4, bytesToWrite, 1, fp);
+
+		char writeBuffer[CHUNK_SIZE];
+		int readBytes = 0;
+		while ((readBytes = read(socket, writeBuffer, fmin(CHUNK_SIZE, bytesToWrite))) > 0) {
+			fwrite(writeBuffer, strlen(writeBuffer), 1, fp);
+			bytesToWrite -= readBytes;
+		}
+
+		fclose(fp);
+		free(path);
+		return 0;
 	}
 
-	return -1;
+	return 0;
+}
+
+int extractDataFromBuffer(char *buffer, char *date, char *type, char *hash, int *length, char **path) {
+	char *dateLoc = strstr(buffer, "date=");
+	if (!dateLoc)
+		return -1;
+	strncpy(date, dateLoc + 5, 20);
+
+	char *typeLoc = strstr(buffer, "type=");
+	if (!typeLoc)
+		return -1;
+	strncpy(type, typeLoc + 5, 9);
+
+	char *hashLoc = strstr(buffer, "hash=");
+	if (!hashLoc)
+		return -1;
+	strncpy(hash, hashLoc + 5, 10);
+
+	char *sizeLoc = strstr(buffer, "file-length=");
+	if (!sizeLoc)
+		return -1;
+	*length = strtol(sizeLoc + 12, NULL, 10);
+
+	char *pathLoc = strstr(buffer, "path=");
+	if (!pathLoc)
+		return -1;
+	int pathLength = strstr(pathLoc, "\r\n") - pathLoc - 5;
+	*path = (char *) malloc(pathLength + strlen(DATA_PATH));
+	strcpy(*path, DATA_PATH);
+	strncat(*path, pathLoc + 5, pathLength);
+
+	return 0;
 }
 
 int sendFile(int socket, char *path) {

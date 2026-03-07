@@ -12,7 +12,7 @@
 #define SERVER_PORT 8080
 #define SERVER_ADDR "127.0.0.1"
 #define CHUNK_SIZE 1024
-#define DATA_PATH "data/"
+#define DATA_PATH "data-client/"
 
 int initConnection();
 int getDate(char *buffer, int bufferLength);
@@ -48,6 +48,12 @@ int initConnection() {
 		exit(1);
 	}
 
+	char *buffer;
+	makeUploadHeader(&buffer, "test");
+	sendHeader(sockfd, buffer);
+	sendFile(sockfd, "test");
+
+	close(sockfd);
 	return 0;
 }
 
@@ -115,8 +121,12 @@ int sendHeader(int socket, char *buffer) {
 }
 
 int sendFile(int socket, char *path) {
-	char *fData[CHUNK_SIZE];
+	char fData[CHUNK_SIZE];
 	FILE *fp = fopen(path, "rb");
+	if (!fp) {
+		printf("File doesn't exist");
+		return 1;
+	}
 
 	size_t nBytes = 0;
 	int sent = 0;

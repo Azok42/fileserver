@@ -16,7 +16,7 @@ cd fileserver
 - **Compile**:
 ```bash
 mkdir build
-gcc src/server.c -o build/server
+gcc src/server.c -o build/server -lm
 gcc src/client.c -o build/client
 ```
 
