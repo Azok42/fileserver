@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "lib/lib.h"
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
@@ -48,63 +49,27 @@ int initConnection() {
 		exit(1);
 	}
 
+	Header headers[10];
+	setHeader(headers, 10, "path", "test");
+	
+	char dateBuf[30];
+	getDate(dateBuf, 30);
+	setHeader(headers, 10, "date", dateBuf);
+	
+	setHeader(headers, 10, "type", "upload");
+
+	char lengthBuffer[30];
+	snprintf(lengthBuffer, 30, "%d", getFileLength("test"));
+	setHeader(headers, 10, "file-length", lengthBuffer);
+
 	char *buffer;
-	makeUploadHeader(&buffer, "test");
+	createHeader(&buffer, headers, 4);
+
 	sendHeader(sockfd, buffer);
 	sendFile(sockfd, "test");
 
 	close(sockfd);
 	return 0;
-}
-
-int makeUploadHeader(char **buffer, char *filePath) {
-	char dateBuf[30];
-	getDate(dateBuf, sizeof dateBuf);
-
-	int fileLength = getFileLength(filePath);
-	
-	char hash[5] = "todo";
-
-	int length = asprintf(buffer, 
-			"date=%s\r\n"
-			"type=upload\r\n"
-			"file-length=%d\r\n"
-			"path=%s\r\n"
-			"hash=%s\r\n"
-			"\r\n",
-			dateBuf, fileLength, filePath, hash); 
-
-	return length;
-}
-
-int makeDownloadHeader(char **buffer, int fileID) {
-	char dateBuf[30];
-	getDate(dateBuf, sizeof dateBuf);
-
-	int length = asprintf(buffer, 
-			"date=%s\r\n"
-			"type=download\r\n"
-			"fileid=%d\r\n"
-			"\r\n",
-			dateBuf, fileID); 
-
-	return length;
-}
-
-int makeSyncHeader(char **buffer) {
-	char dateBuf[30];
-	getDate(dateBuf, sizeof dateBuf);
-
-	char hash[5] = "todo";
-
-	int length = asprintf(buffer, 
-			"date=%s\r\n"
-			"type=sync\r\n"
-			"hash=%s\r\n"
-			"\r\n",
-			dateBuf, hash); 
-
-	return length;
 }
 
 int sendHeader(int socket, char *buffer) {
