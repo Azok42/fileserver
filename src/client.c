@@ -49,7 +49,7 @@ int initConnection() {
 		exit(1);
 	}
 
-	Header headers[10];
+	Header headers[10] = {0};
 	setHeader(headers, 10, "path", "test");
 	
 	char dateBuf[30];
