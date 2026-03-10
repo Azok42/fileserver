@@ -22,7 +22,7 @@ These are the messages the server recieves from the client.
 - fileid: Only for Download; the File-ID of the file specified in the index file
 
 ## Response Header
-These are the messages the server makes to responde to the client requests.
+These are the messages the server makes to respond to the client requests.
 
 - date: The "Day Month Year Hour:Minutes:Seconds" of the time the response was made
 - status: success/failure
