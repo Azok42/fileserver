@@ -30,4 +30,5 @@ These are the messages the server makes to respond to the client requests.
     - failure: means something went wrong or the index file is already sync'd
 - fileid: Only for Upload responses; returns the fileID of the newly uploaded file
 - file-length: Only for Download & Sync Responses; the file size of the file in bytes
+- path: Only for Download; the relative path of the file
 - hash: Only for Download & Sync Repsonses; the hash of the file
