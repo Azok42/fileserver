@@ -22,6 +22,8 @@ typedef struct {
 extern size_t CHUNK_SIZE;
 extern char *DATA_PATH;
 
+void getFullPath(char *path, char *fullPath, int size);
+
 size_t parseHeaders(char *buffer, Header *headers, int maxHeaders) {
 	size_t count = 0;
 	char *copy = strdup(buffer);
@@ -102,13 +104,15 @@ ssize_t createHeader(char **buffer, Header *headers, size_t headerCount) {
 
 ssize_t sendFile(int socket, Header *headers, size_t headerSize) {
 	char *path = getHeaderValue(headers, headerSize, "path");
-	if (!path)
-		return HEADER_PARSE_ERROR;
+	if (!path) return HEADER_PARSE_ERROR;
+
+	char fullPath[265];
+	getFullPath(path, fullPath, 256);
 
 	char fData[CHUNK_SIZE];
-	FILE *fp = fopen(path, "rb");
+	FILE *fp = fopen(fullPath, "rb");
 	if (!fp) {
-		printf("File doesn't exist");
+		printf("file doesn't exist\n");
 		return FILE_IO_ERROR;
 	}
 

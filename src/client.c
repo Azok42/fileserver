@@ -12,6 +12,7 @@ int handleResponse(int socket, Header *headers, int headerCount, char *overhang,
 
 // test functions
 void sendUpload(int sockfd);
+void sendDownload(int sockfd);
 
 int main() {
 	initConnection();
@@ -38,9 +39,28 @@ int initConnection() {
 		exit(1);
 	}
 
+	sendDownload(sockfd);
 	
 	close(sockfd);
 	return 0;
+}
+
+void sendDownload(int sockfd) {
+	Header headers[10] = {0};
+	setHeader(headers, 10, "type", "download");
+
+	char dateBuf[30];
+	getDate(dateBuf, 30);
+	setHeader(headers, 10, "date", dateBuf);
+
+	setHeader(headers, 10, "fileid", "1");
+
+	char *buffer;
+	ssize_t headerCount = createHeader(&buffer, headers, 10);
+
+	sendHeader(sockfd, buffer);
+
+	handleIncomingData(sockfd);
 }
 
 void sendUpload(int sockfd) {
@@ -86,7 +106,7 @@ int handleIncomingData(int socket) {
 		char *dataStart = headerEnd + 4;
 		size_t overhangSize = totalRead - (dataStart - buffer);
 
-		Header headers[10];
+		Header headers[10] = {0};
 		int headerCount = parseHeaders(buffer, headers, 10);
 
 		int res = handleResponse(socket, headers, headerCount, dataStart, overhangSize);
@@ -112,6 +132,7 @@ int handleResponse(int socket, Header *headers, int headerCount, char *overhang,
 		} else { // download
 			char *fileSize = getHeaderValue(headers, headerCount, "file-length");
 			char *hash = getHeaderValue(headers, headerCount, "hash");
+			setHeader(headers, headerCount+1, "path", "test");
 
 			if (!fileSize || !hash) return HEADER_PARSE_ERROR;
 

@@ -82,7 +82,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 	if (strcmp(type, "upload") == 0) {
 		ssize_t result = writeFile(socket, headers, headerCount, overhang, overhangSize);
 
-		Header responseHeaders[10];
+		Header responseHeaders[10] = {0};
 		setHeader(responseHeaders, 10, "status", (result > 0) ? "success" : "failure");
 
 		char dateBuf[30];
@@ -98,7 +98,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 		sendHeader(socket, buffer);
 
 	} if (strcmp(type, "download") == 0) {
-		Header responseHeaders[10];
+		Header responseHeaders[10] = {0};
 		setHeader(responseHeaders, headerCount, "status", "success");
 
 		char dateBuf[30];
@@ -112,6 +112,8 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 		setHeader(responseHeaders, 10, "file-length", lengthBuffer);
 
 		setHeader(responseHeaders, 10, "hash", "todo");
+
+		setHeader(responseHeaders, 10, "path", "test");
 
 		char *buffer;
 		ssize_t responseHeaderCount = createHeader(&buffer, responseHeaders, 10);
@@ -144,7 +146,7 @@ int handleConnection(int socket) {
 		char *dataStart = headerEnd + 4;
 		size_t overhangSize = totalRead - (dataStart - buffer);
 
-		Header headers[10];
+		Header headers[10] = {0};
 		int headerCount = parseHeaders(buffer, headers, 10);
 
 		handleRequest(socket, headers, headerCount, dataStart, overhangSize);
