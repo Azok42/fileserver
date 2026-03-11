@@ -10,6 +10,9 @@ int initConnection();
 int handleIncomingData(int socket);
 int handleResponse(int socket, Header *headers, int headerCount, char *overhang, size_t overhangSize);
 
+// test functions
+void sendUpload(int sockfd);
+
 int main() {
 	initConnection();
 
@@ -35,6 +38,12 @@ int initConnection() {
 		exit(1);
 	}
 
+	
+	close(sockfd);
+	return 0;
+}
+
+void sendUpload(int sockfd) {
 	Header headers[10] = {0};
 	setHeader(headers, 10, "path", "test");
 
@@ -55,9 +64,6 @@ int initConnection() {
 	sendFile(sockfd, headers, headerCount);
 
 	handleIncomingData(sockfd);
-
-	close(sockfd);
-	return 0;
 }
 
 int handleIncomingData(int socket) {
