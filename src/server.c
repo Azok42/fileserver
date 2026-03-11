@@ -1,26 +1,16 @@
 #include "lib/lib.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <unistd.h>
 #include <signal.h>
 
 #define PORT 8080
 #define ADDR "127.0.0.1" // TODO: change that for release
 #define MAX_CLIENTS 10
-#define CHUNK_SIZE 1024
-#define DATA_PATH "data-server/"
+
+size_t CHUNK_SIZE = 1024;
+char *DATA_PATH = "data-server/";
 
 int initConnection();
-int handleConnection(int socket);
-int writeFile(int socket, Header *headers, int count, char *overhang, size_t overhangSize);
 int handleRequest(int socket, Header *headers, int headerCount, char *overhang, size_t overhangSize);
-int sendFile(int socket, char *path);
+int handleConnection(int socket);
 
 // signals
 void handleSigchld(int sig);
@@ -85,6 +75,55 @@ int initConnection() {
 	return 0;
 }
 
+int handleRequest(int socket, Header *headers, int headerCount, char *overhang, size_t overhangSize) {
+	char *type = getHeaderValue(headers, headerCount, "type");
+	if (!type) return -1;
+
+	if (strcmp(type, "upload") == 0) {
+		ssize_t result = writeFile(socket, headers, headerCount, overhang, overhangSize);
+
+		Header responseHeaders[10];
+		setHeader(responseHeaders, 10, "status", (result > 0) ? "success" : "failure");
+
+		char dateBuf[30];
+		getDate(dateBuf, sizeof dateBuf);
+		setHeader(responseHeaders, headerCount, "date", dateBuf);
+
+		char *fileID = "1";
+		setHeader(responseHeaders, 10, "fileid", fileID);
+
+		char *buffer;
+		ssize_t responseHeaderCount = createHeader(&buffer, responseHeaders, 10);
+
+		sendHeader(socket, buffer);
+
+	} if (strcmp(type, "download") == 0) {
+		Header responseHeaders[10];
+		setHeader(responseHeaders, headerCount, "status", "success");
+
+		char dateBuf[30];
+		getDate(dateBuf, sizeof dateBuf);
+		setHeader(responseHeaders, headerCount, "date", dateBuf);
+
+		char lengthBuffer[30];
+		char fullPath[256];
+		getFullPath("test", fullPath, 256);
+		snprintf(lengthBuffer, 30, "%d", getFileLength(fullPath));
+		setHeader(responseHeaders, 10, "file-length", lengthBuffer);
+
+		setHeader(responseHeaders, 10, "hash", "todo");
+
+		char *buffer;
+		ssize_t responseHeaderCount = createHeader(&buffer, responseHeaders, 10);
+
+		sendHeader(socket, buffer);
+		sendFile(socket, responseHeaders, responseHeaderCount);
+	} else
+		return -1;
+
+	return 0;
+}
+
 int handleConnection(int socket) {
 	char *buffer = NULL;
 	size_t totalRead = 0;
@@ -92,7 +131,7 @@ int handleConnection(int socket) {
 	ssize_t tmpRead;
 
 	while ((tmpRead = recv(socket, tmp, sizeof tmp, 0)) > 0) {
-		buffer = realloc(buffer, totalRead + tmpRead + 1);
+		buffer = (char*) realloc(buffer, totalRead + tmpRead + 1);
 		memcpy(buffer + totalRead, tmp, tmpRead);
 		totalRead += tmpRead;
 		buffer[totalRead] = '\0';
@@ -116,67 +155,6 @@ int handleConnection(int socket) {
 
 	free(buffer);
 	return -1;
-}
-
-int handleRequest(int socket, Header *headers, int headerCount, char *overhang, size_t overhangSize) {
-	char *type = getHeaderValue(headers, headerCount, "type");
-	if (!type) return -1;
-
-	if (strcmp(type, "upload") == 0)
-		writeFile(socket, headers, headerCount, overhang, overhangSize);
-	else
-		return -2;
-
-	return 0;
-}
-
-int writeFile(int socket, Header *headers, int count, char *overhang, size_t overhangSize) {
-	char *path = getHeaderValue(headers, count, "path");
-	char *size = getHeaderValue(headers, count, "file-length");
-
-	if (!path || !size) return -1;
-
-	char fullPath[256];
-	snprintf(fullPath, sizeof fullPath, "%s%s", DATA_PATH, path);
-
-	FILE *fp = fopen(fullPath, "wb");
-	if (!fp) return -1;
-
-	if (overhangSize > 0)
-		fwrite(overhang, 1, overhangSize, fp);
-
-	long remaining = atol(size) - overhangSize;
-	char buffer[CHUNK_SIZE];
-	while (remaining > 0) {
-		ssize_t read = recv(socket, buffer, (remaining < CHUNK_SIZE) ? remaining : CHUNK_SIZE, 0);
-		if (read <= 0) break;
-		fwrite(buffer, 1, read, fp);
-		remaining -= read;
-	}
-
-	fclose(fp);
-	return 0;
-}
-
-int sendFile(int socket, char *path) {
-	char *fData[CHUNK_SIZE];
-	FILE *fp = fopen(path, "rb");
-
-	size_t nBytes = 0;
-	int sent = 0;
-
-	while ((nBytes = fread(fData, sizeof(char), CHUNK_SIZE, fp)) > 0) {
-		int offset = 0;
-
-		while ((sent = send(socket, fData + offset, nBytes, 0)) > 0) {
-			offset += sent;
-			nBytes -= sent;
-		}
-	}
-
-	fclose(fp);
-
-	return 0;
 }
 
 void handleSigchld(int sig) {
