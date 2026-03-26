@@ -15,14 +15,19 @@ typedef struct {
 } Header;
 
 // errors
-#define FILE_IO_ERROR -3
 #define HEADER_PARSE_ERROR -2
+#define FILE_IO_ERROR -3
+#define INDEX_ERROR -4
+
+#define INDEX_RECORD_SIZE 256
 
 // globals
 extern size_t CHUNK_SIZE;
 extern char *DATA_PATH;
 
 void getFullPath(char *path, char *fullPath, int size);
+int getLastIDint();
+int getLastIDstr(char **result);
 
 size_t parseHeaders(char *buffer, Header *headers, int maxHeaders) {
 	size_t count = 0;
@@ -86,7 +91,7 @@ ssize_t createHeader(char **buffer, Header *headers, size_t headerCount) {
 
 	size_t currentPos = 0;
 	for (int i = 0; i < headerCount; i++) {
-		if (strcmp(headers[1].key, "") == 0)
+		if (strcmp(headers[i].key, "") == 0)
 			continue;
 
 		int written = sprintf(*buffer + currentPos, "%s=%s\r\n", headers[i].key, headers[i].value);
@@ -112,7 +117,7 @@ ssize_t sendFile(int socket, Header *headers, size_t headerSize) {
 	char fData[CHUNK_SIZE];
 	FILE *fp = fopen(fullPath, "rb");
 	if (!fp) {
-		printf("file doesn't exist\n");
+		printf("file doesn't exist: %s\n", fullPath);
 		return FILE_IO_ERROR;
 	}
 
@@ -203,4 +208,80 @@ int getDate(char *buffer, int bufferLength) {
 	strftime(buffer, bufferLength, "%d %b %Y %H:%M:%S", gmtime(&now));
 
 	return 0;
+}
+
+int addToIndex(char *path, uint32_t hash) {
+	char fullPath[256];
+	getFullPath("index", fullPath, 256);
+
+	FILE *fp = fopen(fullPath, "ab");
+	if (!fp) return FILE_IO_ERROR;
+
+	int id = getLastIDint() + 1;
+
+	char buffer[INDEX_RECORD_SIZE + 1];
+	int written = snprintf(buffer, sizeof buffer, "%-15d %-230s %08x\n", id, path, hash);
+	
+	buffer[written] = ' ';
+	buffer[INDEX_RECORD_SIZE - 1] = '\n';
+
+	int writtenToFile = fwrite(buffer, 1, INDEX_RECORD_SIZE, fp);
+	if (writtenToFile <= 0) return FILE_IO_ERROR;
+
+	fclose(fp);
+	return id;
+}
+
+int updateIndex(char *id, char *path, uint32_t hash) {
+	char fullPath[256];
+	getFullPath("index", fullPath, 256);
+
+	FILE *fp = fopen(fullPath, "r+");
+	if (!fp) return FILE_IO_ERROR;
+
+	char line[INDEX_RECORD_SIZE];
+	while (fread(line, 1, INDEX_RECORD_SIZE, fp) == INDEX_RECORD_SIZE) {
+
+		if (strncmp(line, id, strlen(id)) != 0 || line[strlen(id)] != ' ')
+			continue;
+
+		fseek(fp, -INDEX_RECORD_SIZE, SEEK_CUR);
+
+		char buffer[INDEX_RECORD_SIZE];
+		memset(buffer, ' ', INDEX_RECORD_SIZE);
+
+		snprintf(buffer, INDEX_RECORD_SIZE, "%-15s %-230s %08x", id, path, hash);
+		buffer[INDEX_RECORD_SIZE - 1] = '\n';
+
+		fwrite(buffer, 1, INDEX_RECORD_SIZE, fp);
+		fclose(fp);
+		return 0;
+	}
+	fclose(fp);
+	return INDEX_ERROR;
+}
+
+int getLastIDint() {
+	char fullPath[256];
+	getFullPath("index", fullPath, 256);
+
+	FILE *fp = fopen(fullPath, "rb");
+	if (!fp) return FILE_IO_ERROR;
+
+	fseek(fp, 0, SEEK_END);
+	long fileSize = ftell(fp);
+	if (fileSize < INDEX_RECORD_SIZE) {
+		fclose(fp);
+		return INDEX_ERROR;
+	}
+
+	fseek(fp, -INDEX_RECORD_SIZE, SEEK_END);
+	char line[INDEX_RECORD_SIZE];
+	if (fread(line, 1, INDEX_RECORD_SIZE, fp) != INDEX_RECORD_SIZE) {
+		fclose(fp);
+		return INDEX_ERROR;
+	}
+	fclose(fp);
+
+	return (int) strtol(line, NULL, 10);
 }

@@ -19,7 +19,7 @@ These are the messages the server recieves from the client.
 - hash: Only for Upload & Sync; the hash of the file
 - file-length: Only for Upload; the file size in bytes
 - path: Only for Upload; the relative path of the file
-- fileid: Only for Download; the File-ID of the file specified in the index file
+- fileid: Only for Download and Upload (is -1 if file is new); the File-ID of the file specified in the index file
 
 ## Response Header
 These are the messages the server makes to respond to the client requests.

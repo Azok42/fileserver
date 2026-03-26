@@ -14,8 +14,12 @@ int handleConnection(int socket);
 
 // signals
 void handleSigchld(int sig);
+void handleSigint(int sig);
 
 int main() {
+	signal(SIGINT, handleSigint); 
+	signal(SIGCHLD, handleSigchld);
+
 	initConnection();
 
 	return EXIT_SUCCESS;
@@ -53,8 +57,6 @@ int initConnection() {
 	if (listen(sockfd, MAX_CLIENTS) == 0)
 		printf("Listening for Connections\n");
 
-	signal(SIGCHLD, handleSigchld);
-
 	while (1) {
 		clientSocket = accept(sockfd, (struct sockaddr*)&cliAddr, &addrSize);
 		if (clientSocket < 0) {
@@ -82,6 +84,20 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 	if (strcmp(type, "upload") == 0) {
 		ssize_t result = writeFile(socket, headers, headerCount, overhang, overhangSize);
 
+		char *id = getHeaderValue(headers, headerCount, "fileid");
+		char *path = getHeaderValue(headers, headerCount, "path");
+		char *hash = getHeaderValue(headers, headerCount, "hash");
+
+		if (id == NULL || path == NULL || hash == NULL)
+			return HEADER_PARSE_ERROR;
+
+		uint32_t hashValue = (uint32_t) strtoul(hash, NULL, 16);
+
+		if (strcmp(id, "-1") == 0)
+			addToIndex(path, hashValue);
+		else
+			updateIndex(id, path, hashValue);
+
 		Header responseHeaders[10] = {0};
 		setHeader(responseHeaders, 10, "status", (result > 0) ? "success" : "failure");
 
@@ -89,8 +105,10 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 		getDate(dateBuf, sizeof dateBuf);
 		setHeader(responseHeaders, headerCount, "date", dateBuf);
 
-		char *fileID = "1";
-		setHeader(responseHeaders, 10, "fileid", fileID);
+		int lastFileID = getLastIDint();
+		char lastFileIDStr[15];
+		snprintf(lastFileIDStr, 15, "%d", lastFileID);
+		setHeader(responseHeaders, 10, "fileid", lastFileIDStr);
 
 		char *buffer;
 		ssize_t responseHeaderCount = createHeader(&buffer, responseHeaders, 10);
@@ -161,4 +179,11 @@ int handleConnection(int socket) {
 
 void handleSigchld(int sig) {
 	while (waitpid(-1, NULL, WNOHANG) > 0);
+}
+
+void handleSigint(int sig) {
+	printf("\nExited with SIGINT: %d\n", sig);
+
+	fflush(stdout);
+	exit(0);
 }
