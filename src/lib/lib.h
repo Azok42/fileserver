@@ -107,12 +107,7 @@ ssize_t createHeader(char **buffer, Header *headers, size_t headerCount) {
  	return currentPos;
 }
 
-ssize_t sendFile(int socket, Header *headers, size_t headerSize) {
-	char *path = getHeaderValue(headers, headerSize, "path");
-	if (!path) return HEADER_PARSE_ERROR;
-
-	char fullPath[265];
-	getFullPath(path, fullPath, 256);
+ssize_t sendFile(int socket, char *fullPath, char *fileLength) {
 
 	char fData[CHUNK_SIZE];
 	FILE *fp = fopen(fullPath, "rb");
@@ -134,8 +129,7 @@ ssize_t sendFile(int socket, Header *headers, size_t headerSize) {
 	}
 
 	fclose(fp);
-	size_t sizeHeader = atol(getHeaderValue(headers, headerSize, "file-length"));
-	if (totalSent != sizeHeader) {
+	if (totalSent != atoi(fileLength)) {
 		return FILE_IO_ERROR;
 	}
 
@@ -284,4 +278,8 @@ int getLastIDint() {
 	fclose(fp);
 
 	return (int) strtol(line, NULL, 10);
+}
+
+uint32_t getHashFromFile(char *path) {
+	return 0x1234568;
 }

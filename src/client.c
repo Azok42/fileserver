@@ -13,6 +13,7 @@ int handleResponse(int socket, Header *headers, int headerCount, char *overhang,
 // test functions
 void sendUpload(int sockfd);
 void sendDownload(int sockfd);
+void sendIndex(int sockfd);
 
 int main() {
 	initConnection();
@@ -39,7 +40,7 @@ int initConnection() {
 		exit(1);
 	}
 
-	sendUpload(sockfd);
+	sendIndex(sockfd);
 	
 	close(sockfd);
 	return 0;
@@ -86,7 +87,25 @@ void sendUpload(int sockfd) {
 	ssize_t headerCount = createHeader(&buffer, headers, 10);
 
 	sendHeader(sockfd, buffer);
-	sendFile(sockfd, headers, headerCount);
+	sendFile(sockfd, fullPath, lengthBuffer);
+
+	handleIncomingData(sockfd);
+}
+
+void sendIndex(int sockfd) {
+	Header headers[10] = {0};
+
+	setHeader(headers, 10, "type", "index");
+
+	char dateBuf[30];
+	getDate(dateBuf, 30);
+	setHeader(headers, 10, "date", dateBuf);
+
+	setHeader(headers, 10, "hash", "12345678");
+
+	char *buffer;
+	createHeader(&buffer, headers, 10);
+	sendHeader(sockfd, buffer);
 
 	handleIncomingData(sockfd);
 }
@@ -115,6 +134,7 @@ int handleIncomingData(int socket) {
 		int headerCount = parseHeaders(buffer, headers, 10);
 
 		int res = handleResponse(socket, headers, headerCount, dataStart, overhangSize);
+		printf("HANDLE RESPONSE RES: %d\n", res);
 
 		free(buffer);
 		return 0;
@@ -127,24 +147,31 @@ int handleIncomingData(int socket) {
 int handleResponse(int socket, Header *headers, int headerCount, char *overhang, size_t overhangSize) {
 	char *status = getHeaderValue(headers, headerCount, "status");
 	if (!status) return HEADER_PARSE_ERROR;
+	printf("STATUS: %s\n", status);
 
 	if (strcmp(status, "success") == 0) {
 		char *fileID = getHeaderValue(headers, headerCount, "fileid");
+		char *path = getHeaderValue(headers, headerCount, "path");
 
 		if (fileID) { // upload
-			printf("%s\n", fileID);
+			printf("FILE-ID: %s\n", fileID);
 
-		} else { // download
+		} else if (path){ // download
 			char *fileSize = getHeaderValue(headers, headerCount, "file-length");
 			char *hash = getHeaderValue(headers, headerCount, "hash");
-			setHeader(headers, headerCount+1, "path", "test");
+			char *path = getHeaderValue(headers, headerCount, "path");
 
-			if (!fileSize || !hash) return HEADER_PARSE_ERROR;
+			if (!fileSize || !hash || !path) return HEADER_PARSE_ERROR;
 
 			writeFile(socket, headers, headerCount, overhang, overhangSize);
+		} else { // index
+			setHeader(headers, headerCount + 1, "path", "index");
+
+			int res = writeFile(socket, headers, headerCount + 1, overhang, overhangSize);
+			printf("RES: %d\n", res);
 		}
 
-	} if (strcmp(status, "failure") == 0) {
+	} else if (strcmp(status, "failure") == 0) {
 		printf("Failure response");
 	} else
 		return -1;

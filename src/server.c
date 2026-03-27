@@ -81,7 +81,51 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 	char *type = getHeaderValue(headers, headerCount, "type");
 	if (!type) return -1;
 
-	if (strcmp(type, "upload") == 0) {
+	if (strcmp(type, "index") == 0) {
+		char *hash = getHeaderValue(headers, headerCount, "hash");
+		if (hash == NULL) return HEADER_PARSE_ERROR;
+
+		uint32_t clientHash = strtol(hash, NULL, 16);
+
+		char fullPathIndex[256];
+		getFullPath("index", fullPathIndex, 256);
+
+		uint32_t localHash = getHashFromFile(fullPathIndex);
+
+		Header responseHeaders[10] = {0};
+		char dateBuf[30];
+		getDate(dateBuf, 30);
+		setHeader(responseHeaders, 10, "date", dateBuf);
+
+		if (clientHash == localHash) {
+			setHeader(responseHeaders, 10, "status", "failure");
+	
+			char *buffer;
+			createHeader(&buffer, responseHeaders, 10);
+			sendHeader(socket, buffer);
+		} else {
+			setHeader(responseHeaders, 10, "status", "success");
+
+			char fullPath[256];
+			getFullPath("index", fullPath, 256);
+			
+			char lengthBuffer[30];
+			snprintf(lengthBuffer, 30, "%d", getFileLength(fullPath));
+			setHeader(responseHeaders, 10, "file-length", lengthBuffer);
+
+			char hashBuffer[9];
+			snprintf(hashBuffer, 9, "%08x", localHash);
+			setHeader(responseHeaders, 10, "hash", hashBuffer);
+			
+			char *buffer;
+			createHeader(&buffer, responseHeaders, 10);
+			sendHeader(socket, buffer);
+
+			sendFile(socket, fullPath, lengthBuffer);
+		}
+
+		
+	} else if (strcmp(type, "upload") == 0) {
 		ssize_t result = writeFile(socket, headers, headerCount, overhang, overhangSize);
 
 		char *id = getHeaderValue(headers, headerCount, "fileid");
@@ -115,7 +159,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 
 		sendHeader(socket, buffer);
 
-	} if (strcmp(type, "download") == 0) {
+	} else if (strcmp(type, "download") == 0) {
 		Header responseHeaders[10] = {0};
 		setHeader(responseHeaders, headerCount, "status", "success");
 
@@ -137,7 +181,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 		ssize_t responseHeaderCount = createHeader(&buffer, responseHeaders, 10);
 
 		sendHeader(socket, buffer);
-		sendFile(socket, responseHeaders, responseHeaderCount);
+		sendFile(socket, fullPath, lengthBuffer);
 	} else
 		return -1;
 
@@ -167,6 +211,9 @@ int handleConnection(int socket) {
 		Header headers[10] = {0};
 		int headerCount = parseHeaders(buffer, headers, 10);
 
+char dateBuf[30];
+	getDate(dateBuf, 30);
+	setHeader(headers, 10, "date", dateBuf);
 		handleRequest(socket, headers, headerCount, dataStart, overhangSize);
 
 		free(buffer);
