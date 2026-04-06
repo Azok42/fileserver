@@ -9,6 +9,9 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
+#define CRC32_FAST 0
+#include "crc32.h"
+
 typedef struct {
 	char key[32];
 	char value[128];
@@ -26,8 +29,9 @@ extern size_t CHUNK_SIZE;
 extern char *DATA_PATH;
 
 void getFullPath(char *path, char *fullPath, int size);
-int getLastIDint();
+int getLastID();
 int getLastIDstr(char **result);
+int createIndexFile();
 
 size_t parseHeaders(char *buffer, Header *headers, int maxHeaders) {
 	size_t count = 0;
@@ -211,7 +215,7 @@ int addToIndex(char *path, uint32_t hash) {
 	FILE *fp = fopen(fullPath, "ab");
 	if (!fp) return FILE_IO_ERROR;
 
-	int id = getLastIDint() + 1;
+	int id = getLastID() + 1;
 
 	char buffer[INDEX_RECORD_SIZE + 1];
 	int written = snprintf(buffer, sizeof buffer, "%-15d %-230s %08x\n", id, path, hash);
@@ -255,7 +259,7 @@ int updateIndex(char *id, char *path, uint32_t hash) {
 	return INDEX_ERROR;
 }
 
-int getLastIDint() {
+int getLastID() {
 	char fullPath[256];
 	getFullPath("index", fullPath, 256);
 
@@ -281,5 +285,35 @@ int getLastIDint() {
 }
 
 uint32_t getHashFromFile(char *path) {
-	return 0x1234568;
+	FILE *fp = fopen(path, "rb");
+	if (!fp) return FILE_IO_ERROR;
+
+	unsigned char buffer[CHUNK_SIZE];
+	uint32_t hash = 0;
+	size_t bytesRead;
+
+	while ((bytesRead = fread(buffer, 1, sizeof buffer, fp)) > 0)
+		hash = crc32(hash, buffer, bytesRead);
+
+	fclose(fp);
+	return hash;
+}
+
+int createIndexFile() {
+	char fullPathToIndex[256];
+	getFullPath("index", fullPathToIndex, 256);
+
+	FILE *fp = fopen(fullPathToIndex, "wb");
+	
+	char buffer[INDEX_RECORD_SIZE + 1];
+	int written = snprintf(buffer, sizeof buffer, "%-15s %-230s %08x\n", "0", "index", 0x000000);
+	
+	buffer[written] = ' ';
+	buffer[INDEX_RECORD_SIZE - 1] = '\n';
+
+	if (fwrite(buffer, 1, INDEX_RECORD_SIZE, fp) < INDEX_RECORD_SIZE)
+		return FILE_IO_ERROR;
+	
+	fclose(fp);
+	return 0;
 }

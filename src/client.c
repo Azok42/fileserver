@@ -11,11 +11,12 @@ int handleIncomingData(int socket);
 int handleResponse(int socket, Header *headers, int headerCount, char *overhang, size_t overhangSize);
 
 // test functions
-void sendUpload(int sockfd);
-void sendDownload(int sockfd);
+void sendUpload(int sockfd, char *path);
+void sendDownload(int sockfd, char *fileid);
 void sendIndex(int sockfd);
 
 int main() {
+	int sockfd;
 	initConnection();
 
 	return 0;
@@ -40,13 +41,13 @@ int initConnection() {
 		exit(1);
 	}
 
-	sendIndex(sockfd);
+	sendUpload(sockfd, "test");
 	
 	close(sockfd);
 	return 0;
 }
 
-void sendDownload(int sockfd) {
+void sendDownload(int sockfd, char *fileid) {
 	Header headers[10] = {0};
 	setHeader(headers, 10, "type", "download");
 
@@ -54,7 +55,7 @@ void sendDownload(int sockfd) {
 	getDate(dateBuf, 30);
 	setHeader(headers, 10, "date", dateBuf);
 
-	setHeader(headers, 10, "fileid", "1");
+	setHeader(headers, 10, "fileid", fileid);
 
 	char *buffer;
 	ssize_t headerCount = createHeader(&buffer, headers, 10);
@@ -64,12 +65,11 @@ void sendDownload(int sockfd) {
 	handleIncomingData(sockfd);
 }
 
-void sendUpload(int sockfd) {
+void sendUpload(int sockfd, char *path) {
 	Header headers[10] = {0};
-	setHeader(headers, 10, "path", "testiger");
+	setHeader(headers, 10, "path", path);
 	setHeader(headers, 10, "fileid", "1");
-	setHeader(headers, 10, "hash", "82a45b7f");
-
+	
 	char dateBuf[30];
 	getDate(dateBuf, 30);
 	setHeader(headers, 10, "date", dateBuf);
@@ -77,7 +77,11 @@ void sendUpload(int sockfd) {
 	setHeader(headers, 10, "type", "upload");
 
 	char fullPath[256];
-	getFullPath("testiger", fullPath, 256);
+	getFullPath(path, fullPath, 256);
+
+	char hashBuf[9];
+	snprintf(hashBuf, 9, "%08x", getHashFromFile(fullPath));
+	setHeader(headers, 10, "hash", hashBuf);
 
 	char lengthBuffer[30];
 	snprintf(lengthBuffer, 30, "%d", getFileLength(fullPath));
@@ -101,7 +105,13 @@ void sendIndex(int sockfd) {
 	getDate(dateBuf, 30);
 	setHeader(headers, 10, "date", dateBuf);
 
-	setHeader(headers, 10, "hash", "12345678");
+	char fullPath[256];
+	getFullPath("index", fullPath, 256);
+
+	char hashBuf[9];
+	snprintf(hashBuf, 9, "%08x", getHashFromFile(fullPath));
+	setHeader(headers, 10, "hash", hashBuf);
+	printf("%s\n", hashBuf);
 
 	char *buffer;
 	createHeader(&buffer, headers, 10);
@@ -172,7 +182,7 @@ int handleResponse(int socket, Header *headers, int headerCount, char *overhang,
 		}
 
 	} else if (strcmp(status, "failure") == 0) {
-		printf("Failure response");
+		printf("Failure response\n");
 	} else
 		return -1;
 

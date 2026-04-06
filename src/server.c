@@ -20,6 +20,9 @@ int main() {
 	signal(SIGINT, handleSigint); 
 	signal(SIGCHLD, handleSigchld);
 
+	//int res = createIndexFile();
+	//printf("%d\n", res);
+
 	initConnection();
 
 	return EXIT_SUCCESS;
@@ -91,6 +94,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 		getFullPath("index", fullPathIndex, 256);
 
 		uint32_t localHash = getHashFromFile(fullPathIndex);
+		printf("%08x\n", localHash);
 
 		Header responseHeaders[10] = {0};
 		char dateBuf[30];
@@ -99,7 +103,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 
 		if (clientHash == localHash) {
 			setHeader(responseHeaders, 10, "status", "failure");
-	
+
 			char *buffer;
 			createHeader(&buffer, responseHeaders, 10);
 			sendHeader(socket, buffer);
@@ -108,7 +112,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 
 			char fullPath[256];
 			getFullPath("index", fullPath, 256);
-			
+
 			char lengthBuffer[30];
 			snprintf(lengthBuffer, 30, "%d", getFileLength(fullPath));
 			setHeader(responseHeaders, 10, "file-length", lengthBuffer);
@@ -116,7 +120,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 			char hashBuffer[9];
 			snprintf(hashBuffer, 9, "%08x", localHash);
 			setHeader(responseHeaders, 10, "hash", hashBuffer);
-			
+
 			char *buffer;
 			createHeader(&buffer, responseHeaders, 10);
 			sendHeader(socket, buffer);
@@ -124,7 +128,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 			sendFile(socket, fullPath, lengthBuffer);
 		}
 
-		
+
 	} else if (strcmp(type, "upload") == 0) {
 		ssize_t result = writeFile(socket, headers, headerCount, overhang, overhangSize);
 
@@ -149,7 +153,7 @@ int handleRequest(int socket, Header *headers, int headerCount, char *overhang, 
 		getDate(dateBuf, sizeof dateBuf);
 		setHeader(responseHeaders, headerCount, "date", dateBuf);
 
-		int lastFileID = getLastIDint();
+		int lastFileID = getLastID();
 		char lastFileIDStr[15];
 		snprintf(lastFileIDStr, 15, "%d", lastFileID);
 		setHeader(responseHeaders, 10, "fileid", lastFileIDStr);
@@ -211,9 +215,9 @@ int handleConnection(int socket) {
 		Header headers[10] = {0};
 		int headerCount = parseHeaders(buffer, headers, 10);
 
-char dateBuf[30];
-	getDate(dateBuf, 30);
-	setHeader(headers, 10, "date", dateBuf);
+		char dateBuf[30];
+		getDate(dateBuf, 30);
+		setHeader(headers, 10, "date", dateBuf);
 		handleRequest(socket, headers, headerCount, dataStart, overhangSize);
 
 		free(buffer);
