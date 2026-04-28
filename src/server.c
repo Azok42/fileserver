@@ -2,7 +2,7 @@
 #include <signal.h>
 
 #define PORT 8080
-#define ADDR "127.0.0.1" // TODO: change that for release
+#define ADDR INADDR_ANY // TODO: change that for release
 #define MAX_CLIENTS 10
 
 size_t CHUNK_SIZE = 1024;
@@ -50,7 +50,7 @@ int initConnection() {
 	memset(&serverAddr, '\0', sizeof serverAddr);
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(PORT);
-	serverAddr.sin_addr.s_addr = inet_addr(ADDR);
+	serverAddr.sin_addr.s_addr = ADDR;
 
 	ret = bind(sockfd, (struct sockaddr*)&serverAddr, sizeof serverAddr);
 	if (ret < 0) {
