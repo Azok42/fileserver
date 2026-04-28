@@ -50,7 +50,7 @@ int initConnection() {
 	memset(&serverAddr, '\0', sizeof serverAddr);
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(PORT);
-	serverAddr.sin_addr.s_addr = ADDR;
+	serverAddr.sin_addr.s_addr = htons(ADDR);
 
 	ret = bind(sockfd, (struct sockaddr*)&serverAddr, sizeof serverAddr);
 	if (ret < 0) {
