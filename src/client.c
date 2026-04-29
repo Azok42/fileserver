@@ -6,25 +6,27 @@
 size_t CHUNK_SIZE = 1024;
 char *DATA_PATH = "data-client/";
 
-int initConnection();
+int initConnection(int sockfd);
+void parseParams(int argc, char **argv, int sockfd);
+void printUsage();
 int handleIncomingData(int socket);
 int handleResponse(int socket, Header *headers, int headerCount, char *overhang, size_t overhangSize);
 
-// test functions
 void sendUpload(int sockfd, char *path);
 void sendDownload(int sockfd, char *fileid);
 void sendIndex(int sockfd);
 
-int main() {
+int main(int argc, char **argv) {
 	int sockfd;
-	initConnection();
+	initConnection(sockfd);
 
+	parseParams(argc, argv, sockfd);
+
+	close(sockfd);
 	return 0;
 }
 
-int initConnection() {
-	int sockfd;
-
+int initConnection(int sockfd) {
 	struct sockaddr_in serverAddr;
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (!sockfd) {
@@ -38,13 +40,60 @@ int initConnection() {
 
 	if (connect(sockfd, (struct sockaddr*)&serverAddr, sizeof serverAddr) != 0 ) {
 		printf("Connection failed");
+		close(sockfd);
+		exit(1);
+	}
+	return 0;
+}
+
+void parseParams(int argc, char **argv, int sockfd) {
+	if (argc < 2) {
+		printf("No action specified\n");
+		printUsage();
+		exit(1);
+	}
+	if (argc > 3) {
+		printf("Too many parameters\n");
+		printUsage();
 		exit(1);
 	}
 
-	sendUpload(sockfd, "test");
-	
-	close(sockfd);
-	return 0;
+
+	if (strcmp(argv[1], "upload") == 0) {
+		if (argc < 3) {
+			printf("No path was specified\n");
+			printUsage();
+			exit(1);
+		}
+
+		sendUpload(sockfd, argv[2]);
+	} else if (strcmp(argv[1], "download") == 0) {
+		if (argc < 3) {
+			printf("No ID was specified\n");
+			printUsage();
+			exit(1);
+		}
+		
+		char *ptr;
+		strtol(argv[2], &ptr, 10);
+		if (ptr == argv[2]) {
+			printf("%s is not a valid number\n", argv[2]);
+			exit(1);
+		}
+
+		sendDownload(sockfd, argv[2]);
+	} else if (strcmp(argv[1], "index") == 0) {
+		sendIndex(sockfd);
+	} else {
+		printf("Invalid action: %s\n", argv[1]);
+		printUsage();
+		exit(1);
+	}
+}
+
+void printUsage() {
+	printf("Usage: ./client <action> [<arg>]\n");
+	printf("\nactions:\n\tupload <filePath>\n\tdownload <fileID>\n\tindex\n");
 }
 
 void sendDownload(int sockfd, char *fileid) {
