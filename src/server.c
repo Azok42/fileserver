@@ -2,7 +2,7 @@
 #include <signal.h>
 
 #define PORT 8080
-#define ADDR INADDR_ANY // TODO: change that for release
+#define ADDR INADDR_ANY
 #define MAX_CLIENTS 10
 
 size_t CHUNK_SIZE = 1024;
